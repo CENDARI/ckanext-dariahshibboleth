@@ -23,10 +23,10 @@ class DariahShibbolethPlugin(plugins.SingletonPlugin):
         return {}
 
     def login(self):
-        #try getting user data from Shibboleth
+        # try getting user data from Shibboleth
         userdict = get_shib_data(self)
         if userdict:
-            #check if the user exists
+            # check if the user exists
             user = get_user(userdict['eppn'])
             if not user:
                 # create ckan user
@@ -41,15 +41,20 @@ class DariahShibbolethPlugin(plugins.SingletonPlugin):
             else:
                 log.error('exists eppn: '+ userdict['eppn'])
             self.identify()
+            # redirect to start page (circumvents login quirk if account is newly created)
+            toolkit.redirect_to(controller='home', action='index')
 
     def identify(self):
-        #try getting user data from Shibboleth
+        # try getting user data from Shibboleth
         userdict = get_shib_data(self)
         if userdict:
             toolkit.c.user = userdict['name']
 
     def logout(self):
+        # redirect to local shibboleth logout
+        toolkit.redirect_to(controller='util',action='redirect',url='/Shibboleth.sso/Logout')
         pass
+
     def abort(self, status_code, detail, headers, comment):
         pass
 
