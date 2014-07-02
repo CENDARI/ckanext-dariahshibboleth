@@ -1,0 +1,30 @@
+{% import 'macros/form.html' as form %}
+
+<form class="dataset-form form-horizontal" method="post" action="{{ action }}">
+  {{ form.errors(error_summary) }}
+
+  <fieldset>
+    <legend>{{ _('Change your details') }}</legend>
+
+    Your credentials can only be changed by Admins.
+
+    {{ form.input('name', label=_('Username'), id='field-username', value=data.name, error=errors.name, classes=['control-medium'], attrs={"disabled": "disabled"}) }}
+
+    {{ form.input('fullname', label=_('Full name'), id='field-fullname', value=data.fullname, error=errors.fullname, placeholder=_('eg. Joe Bloggs'), classes=['control-medium'], attrs={"disabled": "disabled"}) }}
+
+    {{ form.input('email', label=_('Email'), id='field-email', type='email', value=data.email, error=errors.email, placeholder=_('eg. joe@example.com'), classes=['control-medium'], attrs={"disabled": "disabled"}) }}
+
+    {{ form.markdown('about', label=_('About'), id='field-about', value=data.about, error=errors.about, placeholder=_('A little information about yourself')) }}
+
+    {% if c.show_email_notifications %}
+      {% call form.checkbox('activity_streams_email_notifications', label=_('Subscribe to notification emails'), id='field-activity-streams-email-notifications', value=True, checked=c.userobj.activity_streams_email_notifications) %}
+      {{ form.info(_("You will receive notification emails from {site_title}, e.g. when you have new activities on your dashboard.".format(site_title=g.site_title)), classes=['info-help-tight']) }}
+      {% endcall %}
+    {% endif %}
+
+  </fieldset>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit" name="save">{{ _('Update Profile') }}</button>
+  </div>
+</form>

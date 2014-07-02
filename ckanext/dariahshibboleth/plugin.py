@@ -4,6 +4,7 @@ import ckan.plugins.toolkit as toolkit
 import ckan.lib.helpers as helpers
 import ckan.model
 import requests
+import pylons
 
 import uuid
 import logging
@@ -30,7 +31,6 @@ class DariahShibbolethPlugin(plugins.SingletonPlugin):
             user = get_user(userdict['eppn'])
             if not user:
                 # create ckan user
-                log.error('no  user with eppn: ' + userdict['eppn'])
                 user = toolkit.get_action('user_create')(
                     context={'ignore_auth': True},
                     data_dict={'email': userdict['mail'],
@@ -38,25 +38,32 @@ class DariahShibbolethPlugin(plugins.SingletonPlugin):
                         'name': userdict['name'],
                         'fullname': userdict['cn'],
                         'password': str(uuid.uuid4())})
+                log.info('newly created and logged in user with eppn: ' + userdict['eppn'])
             else:
-                log.error('exists eppn: '+ userdict['eppn'])
+                log.info('logged in existing user with eppn: '+ userdict['eppn'])
             self.identify()
-            # redirect to start page (circumvents login quirk if account is newly created)
-            toolkit.redirect_to(controller='home', action='index')
+            # save user to pylons session
+            pylons.session['ckanext-dariahshibboleth-user'] = userdict['name']
+            pylons.session.save()
+            # redirect to dashboard
+            toolkit.redirect_to(controller='user', action='dashboard')
 
     def identify(self):
-        # try getting user data from Shibboleth
-        userdict = get_shib_data(self)
-        if userdict:
-            toolkit.c.user = userdict['name']
+        # try getting user from pylons session
+        pylons_user_name = pylons.session.get('ckanext-dariahshibboleth-user')
+        if pylons_user_name:
+            toolkit.c.user = pylons_user_name
 
     def logout(self):
-        # redirect to local shibboleth logout
+        # destroy pylons session (ckan)
+        if 'ckanext-dariahshibboleth-user' in pylons.session:
+            del pylons.session['ckanext-dariahshibboleth-user']
+            pylons.session.save()
+        # redirect to shibboleth logout
         toolkit.redirect_to(controller='util',action='redirect',url='/Shibboleth.sso/Logout')
-        pass
 
     def abort(self, status_code, detail, headers, comment):
-        pass
+        return status_code, detail, headers, comment
 
 
 def get_shib_data(self):
