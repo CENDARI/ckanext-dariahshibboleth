@@ -9,6 +9,7 @@ import pylons
 import uuid
 import logging
 import pprint
+from hashlib import md5
 
 log = logging.getLogger("ckanext.dariahshibboleth")
 
@@ -40,10 +41,21 @@ class DariahShibbolethPlugin(plugins.SingletonPlugin):
                         'password': str(uuid.uuid4())})
                 log.info('newly created and logged in user with eppn: ' + userdict['eppn'])
             else:
+                # check whether we need to update something
+                if not ((user['fullname']==userdict['cn']) or (user['email_hash']==userdict['mail'])):
+                    # update ckan user based on shibboleth data (plus password reset)
+                    user = toolkit.get_action('user_update')(
+                        context={'ignore_auth': True},
+                        data_dict={'id': user['id'],
+                            'email': userdict['mail'],
+                            'fullname': userdict['cn'],
+                            'password': str(uuid.uuid4())})
+                    log.info('updated user with eppn: '+ userdict['eppn'])
+                for key, value in user.iteritems():
+                    log.error(key)
                 log.info('logged in existing user with eppn: '+ userdict['eppn'])
-            self.identify()
             # save user to pylons session
-            pylons.session['ckanext-dariahshibboleth-user'] = userdict['name']
+            pylons.session['ckanext-dariahshibboleth-user'] = user['name']
             pylons.session.save()
             # redirect to dashboard
             toolkit.redirect_to(controller='user', action='dashboard')
@@ -77,17 +89,24 @@ def get_shib_data(self):
     else:
         userdict={'mail': mail,
             'eppn': eppn,
-            'name': generate_user_name(cn),
+            'name': generate_user_name(eppn),
             'cn': cn}
         return userdict
 
 
 def get_user(eppn):
     user = ckan.model.User.by_openid(eppn)
-    return user
+    if not user:
+        return None
+    else:
+        user_dict = toolkit.get_action('user_show')(data_dict={'id': user.id})
+        return user_dict
 
 def generate_user_name(string):
     # actual username generation - TODO: GLOBALLY UNIQUE
-    return string.replace(" ", "").lower()
+    return string.split('@')[0].lower()
 
+def hash_email(email):
+    e = email.strip().lower().encode('utf8')
+    return md5(e).hexdigest()
 
