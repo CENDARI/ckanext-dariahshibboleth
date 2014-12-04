@@ -14,17 +14,32 @@ from hashlib import md5
 log = logging.getLogger("ckanext.dariahshibboleth")
 
 class DariahShibbolethPlugin(plugins.SingletonPlugin):
+    """ 
+    Main plugin class implemeting ``IConfigurer`` and ``IAuthenticator``.
+    """
+
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IAuthenticator)
 
     def update_config(self, config):
-        # use our login form
+        """
+        Add our extended login form template with Shibboleth link to CKAN's toolkit.
+        """
         toolkit.add_template_directory(config, 'templates')
 
     def get_auth_functions(self):
+        """ Pass. """
         return {}
 
     def login(self):
+        """
+        Performs the actual login, if Shibboleth data is found by :py:func:`get_shib_data`.
+
+        If the a CKAN user with the ePPN does not exist, he is created.
+        Otherwise full name and mail address are updated if neccessary.
+
+        Finally, a pylons session is created for session management.
+        """
         # try getting user data from Shibboleth
         userdict = get_shib_data(self)
         if userdict:
@@ -61,12 +76,18 @@ class DariahShibbolethPlugin(plugins.SingletonPlugin):
             toolkit.redirect_to(controller='user', action='dashboard')
 
     def identify(self):
+        """
+        Extracts the logged in user from the pylons session.
+        """
         # try getting user from pylons session
         pylons_user_name = pylons.session.get('ckanext-dariahshibboleth-user')
         if pylons_user_name:
             toolkit.c.user = pylons_user_name
 
     def logout(self):
+        """
+        Log out the user by destroying the pylons session and redirecting to Shibboleth logout.
+        """
         # destroy pylons session (ckan)
         if 'ckanext-dariahshibboleth-user' in pylons.session:
             del pylons.session['ckanext-dariahshibboleth-user']
@@ -75,10 +96,16 @@ class DariahShibbolethPlugin(plugins.SingletonPlugin):
         toolkit.redirect_to(controller='util',action='redirect',url='/Shibboleth.sso/Logout')
 
     def abort(self, status_code, detail, headers, comment):
+        """ Simply passes through an abort. """
         return status_code, detail, headers, comment
 
 
 def get_shib_data(self):
+    '''
+    Extracts full name, email address and ePPN from Shibboleth data.
+
+    :returns: user_dict containing the data or ``None`` if no Shibboleth data is found.
+    '''
     # take the data from the environment, default to blank
     mail = toolkit.request.environ.get('mail','')
     eppn = toolkit.request.environ.get('eppn','')
@@ -95,6 +122,12 @@ def get_shib_data(self):
 
 
 def get_user(eppn):
+    """
+    Look up CKAN user by ePPN.
+
+    :param eppn: String holding the ePPN to look up.
+    :returns: user_dict of the user or ``None``.
+    """
     user = ckan.model.User.by_openid(eppn)
     if not user:
         return None
@@ -102,11 +135,25 @@ def get_user(eppn):
         user_dict = toolkit.get_action('user_show')(data_dict={'id': user.id})
         return user_dict
 
-def generate_user_name(string):
-    # actual username generation - TODO: GLOBALLY UNIQUE
-    return string.split('@')[0].lower()
+def generate_user_name(eppn):
+    """
+    Returns a valid username.
+    
+    .. todo:: Should be done by call to CENDARI API.
+
+    :param eppn: The ePPN to extract the username from.
+    :returns: Lower cased local part of ePPN.
+    """
+    # actual username generation
+    return eppn.split('@')[0].lower()
 
 def hash_email(email):
+    """
+    Create a CKAN style hash from an email.
+
+    :param email: The email address to hash.
+    :returns: hex encoded md5 hash of the normalized email.
+    """
     e = email.strip().lower().encode('utf8')
     return md5(e).hexdigest()
 
