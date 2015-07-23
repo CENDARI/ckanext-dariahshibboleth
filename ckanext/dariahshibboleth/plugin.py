@@ -137,9 +137,8 @@ def get_user(eppn):
 
 def generate_user_name(eppn):
     """
-    Returns a valid username.
-    
-    .. todo:: Should be done by call to CENDARI API.
+    Returns a valid username by defaulting to the ePPN's local part.
+    This is not federation-ready!
 
     :param eppn: The ePPN to extract the username from.
     :returns: Lower cased local part of ePPN.
